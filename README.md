@@ -1,2 +1,11 @@
-# 1m-block
-1백만 개 사이트들을 유해사이트라고 간주하고 차단 
+# netfilter
+
+
+# packet to netfiler
+sudo iptables -F
+sudo iptables -A OUTPUT -j NFQUEUE --queue-num 0
+sudo iptables -A INPUT -j NFQUEUE --queue-num 0
+
+# RUN COMMAND 
+* syntac : 1m-block <site list file>
+* sampe : lm-block top-1m.txt 
