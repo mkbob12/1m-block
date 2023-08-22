@@ -1,8 +1,0 @@
-{
-    "files.associations": {
-        "print_pkt.h": "c",
-        "block_host.h": "c",
-        "string.h": "c",
-        "functional": "c"
-    }
-}
