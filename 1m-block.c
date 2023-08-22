@@ -12,12 +12,9 @@
 #include <libnet.h>
 #include <string.h>
 
+// ip , tcp packet 
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
-
-
-// user h file 
-#include "block_host.h"
 
 
 /* returns packet id */
@@ -25,12 +22,64 @@
 char* block_host;
 
 
+#include <stdio.h>
+#include <string.h>
+#include <stdbool.h>
+
+int check_bhost(char *file, char *host_name){
+
+	FILE *fp = fopen(file, "r");
+	if(fp == NULL){
+		printf("cannot open file: %s\n", file);
+		return -1;
+	};
+
+    printf("searching \n");
+	printf("host_name : %s \n",host_name);
+
+    char line[1024] = {0,};
+    //host_name[strcspn(host_name, "\n")] = 0;
+    bool find = false;
+
+	while (fgets(line, sizeof(line), fp) != NULL) {
+        //line[strcspn(line, "\n")] = 0;
+     
+
+        char *pos = strstr(line,",");
+        pos += 1; 
+        char *last_dot_pos = strrchr(pos, '\n');
+        *last_dot_pos = '\0';
+        char*post = strdup(pos);
+
+		if(strcmp (post, host_name) == 0) {
+			printf("pos%s \n", post);
+			printf("host_name%s \n", host_name);
+			printf("%s is in the block_host \n", host_name);
+			find = true;
+			break;
+		}
+		
+	}
+
+	if (find) {
+		fclose(fp);
+		return 1;
+	} else {
+		fclose(fp);
+		return 0;
+	}
+};
+
+
+
+
+
 void sigint_handler(int sig) {
     
 	system("sudo iptables -F");
 	printf("ctrl+c pressed: quitting...\n");
     exit(0);
-}
+};
 
 void dump(unsigned char* buf, int size) {
 	int i;
@@ -41,7 +90,7 @@ void dump(unsigned char* buf, int size) {
 	}
 	printf("\n");
 
-}
+};
 
 static u_int32_t print_pkt (struct nfq_data *tb)
 {
@@ -57,45 +106,27 @@ static u_int32_t print_pkt (struct nfq_data *tb)
 	ph = nfq_get_msg_packet_hdr(tb);
 	if (ph) {
 		id = ntohl(ph->packet_id);
-		printf("hw_protocol=0x%04x hook=%u id=%u ",
-			ntohs(ph->hw_protocol), ph->hook, id);
 	}
 
 	hwph = nfq_get_packet_hw(tb);
 	if (hwph) {
 		int i, hlen = ntohs(hwph->hw_addrlen);
-
-		printf("hw_src_addr=");
-		for (i = 0; i < hlen-1; i++)
-			printf("%02x:", hwph->hw_addr[i]);
-		printf("%02x ", hwph->hw_addr[hlen-1]);
 	}	
 	
 
 	mark = nfq_get_nfmark(tb);
-	if (mark)
-		printf("mark=%u ", mark);
 
 	ifi = nfq_get_indev(tb);
-	if (ifi)
-		printf("indev=%u ", ifi);
-
+	
 	ifi = nfq_get_outdev(tb);
-	if (ifi)
-		printf("outdev=%u ", ifi);
-	ifi = nfq_get_physindev(tb);
-	if (ifi)
-		printf("physindev=%u ", ifi);
 
+	ifi = nfq_get_physindev(tb);
+	
 	ifi = nfq_get_physoutdev(tb);
-	if (ifi)
-		printf("physoutdev=%u ", ifi);
+	
 
 	ret = nfq_get_payload(tb, &data);
-	if (ret >= 0){
-                printf("payload_len=%d\n", ret);
-                //dump(data,ret);
-	}
+	
 		
 	fputc('\n', stdout);
 
@@ -117,7 +148,6 @@ static int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 	struct libnet_tcp_hdr *tcph= (struct libnet_tcp_hdr *) (packet + (iph->ip_hl * 4));
         
 	unsigned char *tcp_len = packet + (iph->ip_hl * 4) + (tcph->th_off* 4);
-	printf("tcp len%d", tcp_len);
 
 
 	printf("\n tcp %02x ",ntohs(tcph->th_dport));
@@ -145,8 +175,8 @@ static int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
                     printf("Host: %s\n", host_start);
 					// compare 
                     
-                    if (strcmp(host_start, block_host) == 0) {
-                        printf("%s Blocked host detected!\n",block_host);
+                    if (check_bhost(block_host, host_start)) {
+                        //printf("%s Blocked host detected!\n",host_start);
                         return nfq_set_verdict(qh, id, NF_DROP, 0, NULL);
                     }
                 }
@@ -171,8 +201,13 @@ int main(int argc, char **argv)
 	block_host = argv[1]; 
 
 	system("sudo iptables -F");
+	
 	system("sudo iptables -A OUTPUT -j NFQUEUE --queue-num 0");
 	system("sudo iptables -A INPUT -j NFQUEUE --queue-num 0");
+
+	printf("sudo iptables -F");
+	printf("sudo iptables -A OUTPUT -j NFQUEUE --queue-num 0");
+	printf("sudo iptables -A INPUT -j NFQUEUE --queue-num 0");
 
 
 
@@ -213,7 +248,7 @@ int main(int argc, char **argv)
 
 	for (;;) {
 		if ((rv = recv(fd, buf, sizeof(buf), 0)) >= 0) {
-			printf("pkt received\n");
+			
 			nfq_handle_packet(h, buf, rv);
 			signal(SIGINT, sigint_handler);
 
