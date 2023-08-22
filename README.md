@@ -1,4 +1,5 @@
 # netfilter
+gcc -o 1m-block 1m-block.c -lnetfilter_queue
 
 
 # packet to netfiler
